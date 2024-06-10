@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HAR Downloader</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 50px;
+      }
+      h1 {
+        text-align: center;
+      }
+      form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      input,
+      button {
+        margin: 10px;
+        padding: 10px;
+        font-size: 16px;
+      }
+      #downloadLink {
+        margin-top: 20px;
+        display: none;
+        text-decoration: none;
+        color: white;
+        background-color: #4caf50;
+        padding: 10px 20px;
+        border-radius: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>HAR Downloader</h1>
+    <form id="harForm">
+      <label for="url">Enter Website URL:</label>
+      <input type="text" id="url" name="url" required />
+      <button type="submit">Download HAR</button>
+    </form>
+    <a id="downloadLink">Download HAR File</a>
+
+    <script>
+      async function captureHAR(url) {
+        // Open a new window and capture network requests
+        const har = {
+          log: {
+            version: "1.2",
+            creator: { name: "Client-side HAR Capturer", version: "1.0" },
+            pages: [],
+            entries: [],
+          },
+        };
+
+        return new Promise((resolve, reject) => {
+          const newWindow = window.open(url, "newWindow");
+          if (!newWindow) {
+            return reject("Failed to open new window");
+          }
+
+          const observer = new PerformanceObserver((list) => {
+            const entries = list.getEntries();
+            entries.forEach((entry) => {
+              if (entry.entryType === "resource") {
+                har.log.entries.push({
+                  startedDateTime: new Date(entry.startTime).toISOString(),
+                  time: entry.duration,
+                  request: {
+                    method: "GET",
+                    url: entry.name,
+                    headers: {},
+                  },
+                  response: {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {},
+                  },
+                });
+              }
+            });
+          });
+
+          observer.observe({ entryTypes: ["resource"] });
+
+          newWindow.addEventListener("load", () => {
+            setTimeout(() => {
+              observer.disconnect();
+              newWindow.close();
+              resolve(har);
+            }, 5000); // Wait for 5 seconds to capture network requests
+          });
+        });
+      }
+
+      document
+        .getElementById("harForm")
+        .addEventListener("submit", async function (event) {
+          event.preventDefault();
+          const url = document.getElementById("url").value;
+          try {
+            const har = await captureHAR(url);
+            const blob = new Blob([JSON.stringify(har, null, 2)], {
+              type: "application/json",
+            });
+            const downloadLink = document.getElementById("downloadLink");
+            const urlBlob = URL.createObjectURL(blob);
+            downloadLink.href = urlBlob;
+            downloadLink.download = "website.har";
+            downloadLink.style.display = "block";
+            downloadLink.textContent = "Download HAR File";
+          } catch (error) {
+            alert("Error capturing HAR file. " + error);
+          }
+        });
+    </script>
+  </body>
+</html>
